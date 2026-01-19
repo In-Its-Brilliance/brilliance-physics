@@ -10,7 +10,7 @@ physics-rapier = ["rapier3d"]
 physics-physx = ["physx", "physx-sys"]
 
 [dependencies]
-common = { path = "../rheia-common" }
+common = { path = "../brilliance-common" }
 
 serde = { version = "1.0", features = ["derive"] }
 log = { version = "0.4.22" }

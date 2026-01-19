@@ -5,13 +5,14 @@ use super::collider::{RapierPhysicsCollider, RapierPhysicsShape};
 use super::query_filter::RapierQueryFilter;
 use common::chunks::position::Vector3;
 use rapier3d::control::{CharacterCollision, CharacterLength, KinematicCharacterController};
+use rapier3d::prelude::{Collider, ColliderHandle};
 
 pub struct RapierPhysicsCharacterController {
     character_controller: KinematicCharacterController,
     custom_mass: Option<f32>,
 }
 
-impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, RapierQueryFilter<'a>>
+impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, RapierQueryFilter>
     for RapierPhysicsCharacterController
 {
     fn create(custom_mass: Option<f32>, snap_to_ground: Option<f32>) -> Self {
@@ -46,6 +47,12 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
             .unwrap()
             .clone();
 
+        let mut rapier_filter = filter.get_filter();
+        let adapter = |handle: ColliderHandle, _: &Collider| {
+            (filter.predicate)(handle.into_raw_parts().0 as usize)
+        };
+        rapier_filter = rapier_filter.predicate(&adapter);
+
         let corrected_movement = self.character_controller.move_shape(
             delta as f32,
             &physics_container.rigid_body_set.read(),
@@ -54,7 +61,7 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
             collider.shape(),
             collider.position(),
             movement.to_na(),
-            filter.filter,
+            rapier_filter,
             |_| {},
         );
         // self.grounded = corrected_movement.grounded;
@@ -69,7 +76,7 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
                 collider.shape(),
                 character_mass,
                 _collisions.iter(),
-                filter.filter,
+                rapier_filter,
             );
         };
 
