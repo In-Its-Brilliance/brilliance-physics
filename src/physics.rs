@@ -3,6 +3,7 @@ use common::chunks::{block_position::BlockPosition, position::Vector3};
 pub trait IQueryFilter<S: IPhysicsShape, C: IPhysicsCollider<S>>: Default {
     fn exclude_collider(&mut self, collider: &C);
     fn exclude_sensors(&mut self);
+    fn collision_mask(&mut self, groups: u32, mask: u32);
     fn predicate(&mut self, predicate: Box<dyn Fn(usize) -> bool>);
 }
 
@@ -17,6 +18,7 @@ pub trait IPhysicsCollider<S: IPhysicsShape> {
     fn get_shape(&self) -> S;
     fn set_shape(&mut self, shape: S);
     fn set_sensor(&self, is_sensor: bool);
+    fn set_collision_mask(&self, groups: u32, mask: u32);
 }
 
 pub trait IPhysicsCharacterController<S: IPhysicsShape, C: IPhysicsCollider<S>, F: IQueryFilter<S, C>> {

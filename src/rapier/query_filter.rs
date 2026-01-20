@@ -1,12 +1,12 @@
-use rapier3d::prelude::{ColliderHandle, QueryFilter};
-
-use crate::physics::IQueryFilter;
-
 use super::collider::{RapierPhysicsCollider, RapierPhysicsShape};
+use crate::physics::IQueryFilter;
+use rapier3d::prelude::{InteractionGroups, Group};
+use rapier3d::prelude::{ColliderHandle, QueryFilter};
 
 pub struct RapierQueryFilter {
     exclude_sensors: bool,
     excluded_colliders: Vec<ColliderHandle>,
+    interaction_groups: Option<InteractionGroups>,
     pub(crate) predicate: Box<dyn Fn(usize) -> bool>,
 }
 
@@ -15,6 +15,7 @@ impl Default for RapierQueryFilter {
         Self {
             exclude_sensors: false,
             excluded_colliders: Default::default(),
+            interaction_groups: None,
             predicate: Box::new(|_| true),
         }
     }
@@ -26,6 +27,10 @@ impl RapierQueryFilter {
 
         if self.exclude_sensors {
             filter = filter.exclude_sensors();
+        }
+
+        if let Some(groups) = self.interaction_groups {
+            filter = filter.groups(groups);
         }
 
         for h in &self.excluded_colliders {
@@ -42,6 +47,15 @@ impl IQueryFilter<RapierPhysicsShape, RapierPhysicsCollider> for RapierQueryFilt
 
     fn exclude_sensors(&mut self) {
         self.exclude_sensors = true;
+    }
+
+    fn collision_mask(&mut self, groups: u32, mask: u32) {
+        self.interaction_groups = Some(
+            InteractionGroups::new(
+                Group::from_bits_truncate(groups),
+                Group::from_bits_truncate(mask),
+            )
+        );
     }
 
     fn predicate(&mut self, predicate: Box<dyn Fn(usize) -> bool>) {

@@ -31,7 +31,10 @@ pub struct RapierPhysicsCollider {
 }
 
 impl RapierPhysicsCollider {
-    pub fn create(physics_container: &RapierPhysicsContainer, collider_handle: ColliderHandle) -> Self {
+    pub fn create(
+        physics_container: &RapierPhysicsContainer,
+        collider_handle: ColliderHandle,
+    ) -> Self {
         Self {
             physics_container: physics_container.clone(),
             collider_handle,
@@ -41,12 +44,18 @@ impl RapierPhysicsCollider {
 
 impl IPhysicsCollider<RapierPhysicsShape> for RapierPhysicsCollider {
     fn get_position(&self) -> NetworkVector3 {
-        let collider = self.physics_container.get_collider_mut(&self.collider_handle).unwrap();
+        let collider = self
+            .physics_container
+            .get_collider_mut(&self.collider_handle)
+            .unwrap();
         na_to_network(&collider.translation())
     }
 
     fn set_position(&mut self, position: NetworkVector3) {
-        let mut collider = self.physics_container.get_collider_mut(&self.collider_handle).unwrap();
+        let mut collider = self
+            .physics_container
+            .get_collider_mut(&self.collider_handle)
+            .unwrap();
         collider.set_translation(position.to_na());
     }
 
@@ -80,7 +89,10 @@ impl IPhysicsCollider<RapierPhysicsShape> for RapierPhysicsCollider {
     }
 
     fn set_shape(&mut self, shape: RapierPhysicsShape) {
-        let mut collider = self.physics_container.get_collider_mut(&self.collider_handle).unwrap();
+        let mut collider = self
+            .physics_container
+            .get_collider_mut(&self.collider_handle)
+            .unwrap();
         let s = shape.get_shape().clone_dyn();
         let shape = SharedShape(s.into());
         collider.set_shape(shape);
@@ -92,5 +104,18 @@ impl IPhysicsCollider<RapierPhysicsShape> for RapierPhysicsCollider {
             .get_collider_mut(&self.collider_handle)
             .unwrap();
         collider.set_sensor(is_sensor);
+    }
+
+    fn set_collision_mask(&self, groups: u32, mask: u32) {
+        let groups = InteractionGroups::new(
+            Group::from_bits_truncate(groups),
+            Group::from_bits_truncate(mask),
+        );
+
+        let physics_container = self.physics_container.clone();
+        let mut collider = physics_container
+            .get_collider_mut(&self.collider_handle)
+            .unwrap();
+        collider.set_collision_groups(groups);
     }
 }
