@@ -7,6 +7,7 @@ pub struct RapierQueryFilter {
     exclude_sensors: bool,
     excluded_colliders: Vec<ColliderHandle>,
     interaction_groups: Option<InteractionGroups>,
+    pub(crate) is_predicate: bool,
     pub(crate) predicate: Box<dyn Fn(usize) -> bool>,
 }
 
@@ -16,6 +17,7 @@ impl Default for RapierQueryFilter {
             exclude_sensors: false,
             excluded_colliders: Default::default(),
             interaction_groups: None,
+            is_predicate: false,
             predicate: Box::new(|_| true),
         }
     }
@@ -60,5 +62,6 @@ impl IQueryFilter<RapierPhysicsShape, RapierPhysicsCollider> for RapierQueryFilt
 
     fn predicate(&mut self, predicate: Box<dyn Fn(usize) -> bool>) {
         self.predicate = predicate;
+        self.is_predicate = true;
     }
 }

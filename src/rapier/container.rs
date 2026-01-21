@@ -126,7 +126,9 @@ impl
         let adapter = |handle: ColliderHandle, _: &Collider| {
             (filter.predicate)(handle.into_raw_parts().0 as usize)
         };
-        rapier_filter = rapier_filter.predicate(&adapter);
+        if filter.is_predicate {
+            rapier_filter = rapier_filter.predicate(&adapter);
+        }
 
         let pipeline = self.query_pipeline.read();
         if let Some((handle, ray_intersection)) = pipeline.cast_ray_and_get_normal(
@@ -171,7 +173,9 @@ impl
         let adapter = |handle: ColliderHandle, _: &Collider| {
             (filter.predicate)(handle.into_raw_parts().0 as usize)
         };
-        rapier_filter = rapier_filter.predicate(&adapter);
+        if filter.is_predicate {
+            rapier_filter = rapier_filter.predicate(&adapter);
+        }
 
         let options = ShapeCastOptions::with_max_time_of_impact(max_toi);
         let pipeline = self.query_pipeline.read();

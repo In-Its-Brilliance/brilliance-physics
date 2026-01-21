@@ -51,7 +51,9 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
         let adapter = |handle: ColliderHandle, _: &Collider| {
             (filter.predicate)(handle.into_raw_parts().0 as usize)
         };
-        rapier_filter = rapier_filter.predicate(&adapter);
+        if filter.is_predicate {
+            rapier_filter = rapier_filter.predicate(&adapter);
+        }
 
         let corrected_movement = self.character_controller.move_shape(
             delta as f32,
