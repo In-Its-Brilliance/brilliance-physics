@@ -1,6 +1,6 @@
 use crate::physics::IPhysicsCharacterController;
 
-use super::bridge::{IntoNaVector3, na_to_network};
+use super::bridge::{na_to_network, IntoNaVector3};
 use super::collider::{RapierPhysicsCollider, RapierPhysicsShape};
 use super::query_filter::RapierQueryFilter;
 use common::chunks::position::Vector3;
@@ -41,11 +41,10 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
         delta: f64,
         movement: Vector3,
     ) -> Vector3 {
-        let physics_container = collider.physics_container.clone();
-        let collider = physics_container
+        let rapier_collider = collider
+            .physics_container
             .get_collider(&collider.collider_handle)
-            .unwrap()
-            .clone();
+            .unwrap();
 
         let mut rapier_filter = filter.get_filter();
         let adapter = |handle: ColliderHandle, _: &Collider| {
@@ -57,11 +56,11 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
 
         let corrected_movement = self.character_controller.move_shape(
             delta as f32,
-            &physics_container.rigid_body_set.read(),
-            &physics_container.collider_set.read(),
-            &physics_container.query_pipeline.read(),
-            collider.shape(),
-            collider.position(),
+            &collider.physics_container.rigid_body_set.read(),
+            &collider.physics_container.collider_set.read(),
+            &collider.physics_container.query_pipeline.read(),
+            rapier_collider.shape(),
+            rapier_collider.position(),
             movement.to_na(),
             rapier_filter,
             |_| {},
@@ -70,16 +69,17 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
 
         let _collisions: Vec<CharacterCollision> = vec![];
         if let Some(character_mass) = self.custom_mass {
-            self.character_controller.solve_character_collision_impulses(
-                delta as f32,
-                &mut physics_container.rigid_body_set.write(),
-                &physics_container.collider_set.read(),
-                &physics_container.query_pipeline.read(),
-                collider.shape(),
-                character_mass,
-                _collisions.iter(),
-                rapier_filter,
-            );
+            self.character_controller
+                .solve_character_collision_impulses(
+                    delta as f32,
+                    &mut collider.physics_container.rigid_body_set.write(),
+                    &collider.physics_container.collider_set.read(),
+                    &collider.physics_container.query_pipeline.read(),
+                    rapier_collider.shape(),
+                    character_mass,
+                    _collisions.iter(),
+                    rapier_filter,
+                );
         };
 
         na_to_network(&corrected_movement.translation)
@@ -94,11 +94,13 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
 mod tests {
     use crate::{
         physics::{
-            IPhysicsCharacterController, IPhysicsCollider, IPhysicsColliderBuilder, IPhysicsContainer, IQueryFilter,
+            IPhysicsCharacterController, IPhysicsCollider, IPhysicsColliderBuilder,
+            IPhysicsContainer, IQueryFilter,
         },
         rapier::{
-            character_controller::RapierPhysicsCharacterController, collider_builder::RapierPhysicsColliderBuilder,
-            container::RapierPhysicsContainer, query_filter::RapierQueryFilter,
+            character_controller::RapierPhysicsCharacterController,
+            collider_builder::RapierPhysicsColliderBuilder, container::RapierPhysicsContainer,
+            query_filter::RapierQueryFilter,
         },
     };
     use common::chunks::position::Vector3;
@@ -109,10 +111,12 @@ mod tests {
         let collider_builder = RapierPhysicsColliderBuilder::cylinder(2.0, 1.0);
         let collider = physics.spawn_collider(collider_builder);
 
-        let mut character_controller = RapierPhysicsCharacterController::create(Some(1.0), Some(0.1));
+        let mut character_controller =
+            RapierPhysicsCharacterController::create(Some(1.0), Some(0.1));
         let filter = RapierQueryFilter::default();
 
-        let result = character_controller.move_shape(&collider, filter, 0.5, Vector3::new(0.0, 1.0, 0.0));
+        let result =
+            character_controller.move_shape(&collider, filter, 0.5, Vector3::new(0.0, 1.0, 0.0));
         assert_eq!(result, Vector3::new(0.0, 1.0, 0.0));
     }
 
@@ -134,7 +138,12 @@ mod tests {
         let mut filter = RapierQueryFilter::default();
         filter.exclude_sensors();
 
-        let cast_ray = physics.cast_ray(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0.0, 1.0, 0.0), 10.0, filter);
+        let cast_ray = physics.cast_ray(
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            10.0,
+            filter,
+        );
         assert!(cast_ray.is_some());
         assert_eq!(cast_ray.unwrap().collider_id, collider.get_index());
     }

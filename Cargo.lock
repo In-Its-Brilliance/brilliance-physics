@@ -4042,3 +4042,7 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "network"
+version = "0.1.0"

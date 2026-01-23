@@ -81,8 +81,8 @@ impl IPhysicsCollider<RapierPhysicsShape> for RapierPhysicsCollider {
     }
 
     fn get_shape(&self) -> RapierPhysicsShape {
-        let physics_container = self.physics_container.clone();
-        let collider = physics_container
+        let collider = self
+            .physics_container
             .get_collider(&self.collider_handle)
             .unwrap();
         RapierPhysicsShape::create(collider.shape())
@@ -99,8 +99,8 @@ impl IPhysicsCollider<RapierPhysicsShape> for RapierPhysicsCollider {
     }
 
     fn set_sensor(&self, is_sensor: bool) {
-        let physics_container = self.physics_container.clone();
-        let mut collider = physics_container
+        let mut collider = self
+            .physics_container
             .get_collider_mut(&self.collider_handle)
             .unwrap();
         collider.set_sensor(is_sensor);
@@ -112,8 +112,8 @@ impl IPhysicsCollider<RapierPhysicsShape> for RapierPhysicsCollider {
             Group::from_bits_truncate(mask),
         );
 
-        let physics_container = self.physics_container.clone();
-        let mut collider = physics_container
+        let mut collider = self
+            .physics_container
             .get_collider_mut(&self.collider_handle)
             .unwrap();
         collider.set_collision_groups(groups);
