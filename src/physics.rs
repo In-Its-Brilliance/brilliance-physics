@@ -1,4 +1,7 @@
-use common::chunks::{block_position::BlockPosition, position::Vector3};
+use common::{
+    chunks::{block_position::BlockPosition, position::Vector3},
+    utils::debug::info::DebugInfo,
+};
 
 pub trait IQueryFilter<S: IPhysicsShape, C: IPhysicsCollider<S>>: Default {
     fn exclude_collider(&mut self, collider: &C);
@@ -14,7 +17,7 @@ pub trait IPhysicsCollider<S: IPhysicsShape> {
     fn set_position(&mut self, position: Vector3);
     fn set_enabled(&mut self, active: bool);
     fn get_index(&self) -> usize;
-    fn remove(&mut self);
+    fn remove(&self);
     fn get_shape(&self) -> S;
     fn set_shape(&mut self, shape: S);
     fn set_sensor(&self, is_sensor: bool);
@@ -34,14 +37,20 @@ pub trait IPhysicsColliderBuilder<S: IPhysicsShape> {
     fn get_shape(&self) -> S;
 }
 
-pub trait IPhysicsContainer<S: IPhysicsShape, C: IPhysicsCollider<S>, B: IPhysicsColliderBuilder<S>, F: IQueryFilter<S, C>>:
-    Clone + Default
+pub trait IPhysicsContainer<
+    S: IPhysicsShape,
+    C: IPhysicsCollider<S>,
+    B: IPhysicsColliderBuilder<S>,
+    F: IQueryFilter<S, C>,
+>: Clone + Default
 {
     fn step(&self, delta: f32);
     fn spawn_collider(&self, collider_builder: B) -> C;
 
     fn cast_ray(&self, origin: Vector3, dir: Vector3, max_toi: f32, filter: F) -> Option<RayCastResultNormal>;
     fn cast_shape(&self, shape: S, origin: Vector3, dir: Vector3, max_toi: f32, filter: F) -> Option<ShapeCastResult>;
+
+    fn get_debug_info(&self) -> DebugInfo;
 }
 
 #[derive(Clone, Debug, Copy, PartialEq)]

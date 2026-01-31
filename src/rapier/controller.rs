@@ -43,7 +43,12 @@ impl RapierPhysicsController {
             &mut self.impulse_joint_set,
             &mut self.multibody_joint_set,
             &mut self.ccd_solver,
-            Some(&mut physics_container.query_pipeline.write()),
+
+            // QueryPipeline обновляется отдельно в RapierPhysicsContainer::step()
+            // через rebuild_query_pipeline() для контроля частоты обновлений
+            // Some(&mut physics_container.query_pipeline.write()),
+            None,
+
             &physics_hooks,
             &event_handler,
         );

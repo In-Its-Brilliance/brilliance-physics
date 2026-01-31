@@ -1,10 +1,12 @@
-use common::chunks::position::Vector3;
-use nalgebra::Point3;
-use parking_lot::{
-    MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
+use common::{
+    chunks::position::Vector3,
+    timed_lock,
+    utils::debug::{info::DebugInfo, SmartRwLock},
 };
+use nalgebra::Point3;
+use parking_lot::{MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 use rapier3d::{parry::query::ShapeCastOptions, prelude::*};
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use crate::physics::{IPhysicsContainer, RayCastResultNormal, ShapeCastResult};
 
@@ -18,44 +20,61 @@ use super::{
 
 #[derive(Clone)]
 pub struct RapierPhysicsContainer {
-    pub(crate) controller: Arc<RwLock<RapierPhysicsController>>,
-    pub(crate) rigid_body_set: Arc<RwLock<RigidBodySet>>,
-    pub(crate) collider_set: Arc<RwLock<ColliderSet>>,
-    pub(crate) query_pipeline: Arc<RwLock<QueryPipeline>>,
-    pub(crate) island_manager: Arc<RwLock<IslandManager>>,
+    pub(crate) controller: Arc<SmartRwLock<RapierPhysicsController>>,
+    pub(crate) rigid_body_set: Arc<SmartRwLock<RigidBodySet>>,
+    pub(crate) collider_set: Arc<SmartRwLock<ColliderSet>>,
+    pub(crate) query_pipeline: Arc<SmartRwLock<QueryPipeline>>,
+    pub(crate) island_manager: Arc<SmartRwLock<IslandManager>>,
+
+    pub(crate) last_step_duration: Arc<SmartRwLock<std::time::Duration>>,
+    colliders_changed: Arc<SmartRwLock<bool>>,
+}
+
+#[rustfmt::skip]
+impl Default for RapierPhysicsContainer {
+    fn default() -> Self {
+        let rapier_physics_container = Self {
+            controller: Arc::new(timed_lock!(RapierPhysicsController::create(), "RapierPhysicsContainer::controller")),
+            rigid_body_set: Arc::new(timed_lock!(RigidBodySet::new(), "RapierPhysicsContainer::rigid_body_set")),
+            collider_set: Arc::new(timed_lock!(ColliderSet::new(), "RapierPhysicsContainer::collider_set")),
+            query_pipeline: Arc::new(timed_lock!(QueryPipeline::new(), "RapierPhysicsContainer::query_pipeline")),
+            island_manager: Arc::new(timed_lock!(IslandManager::new(), "RapierPhysicsContainer::island_manager")),
+
+            last_step_duration: Arc::new(timed_lock!(Default::default(), "RapierPhysicsContainer::last_step_duration")),
+            colliders_changed: Arc::new(timed_lock!(false, "RapierPhysicsContainer::colliders_changed")),
+       };
+        rapier_physics_container
+    }
 }
 
 impl RapierPhysicsContainer {
-    pub fn get_collider(
-        &self,
-        collider_handle: &ColliderHandle,
-    ) -> Option<MappedRwLockReadGuard<'_, Collider>> {
-        RwLockReadGuard::try_map(self.collider_set.read(), |p| {
-            match p.get(*collider_handle) {
-                Some(c) => Some(c),
-                None => None,
-            }
+    pub fn get_collider(&self, collider_handle: &ColliderHandle) -> Option<MappedRwLockReadGuard<'_, Collider>> {
+        RwLockReadGuard::try_map(self.collider_set.read(), |p| match p.get(*collider_handle) {
+            Some(c) => Some(c),
+            None => None,
         })
         .ok()
     }
 
-    pub fn get_collider_mut(
-        &self,
-        collider_handle: &ColliderHandle,
-    ) -> Option<MappedRwLockWriteGuard<'_, Collider>> {
-        RwLockWriteGuard::try_map(self.collider_set.write(), |p| {
-            match p.get_mut(*collider_handle) {
-                Some(c) => Some(c),
-                None => None,
-            }
+    pub fn get_collider_mut(&self, collider_handle: &ColliderHandle) -> Option<MappedRwLockWriteGuard<'_, Collider>> {
+        RwLockWriteGuard::try_map(self.collider_set.write(), |p| match p.get_mut(*collider_handle) {
+            Some(c) => Some(c),
+            None => None,
         })
         .ok()
     }
 
-    pub fn get_rigid_body(
-        &self,
-        rigid_handle: &RigidBodyHandle,
-    ) -> Option<MappedRwLockReadGuard<'_, RigidBody>> {
+    pub(crate) fn remove_collider(&self, collider_handle: ColliderHandle) {
+        *self.colliders_changed.write() = true;
+        self.collider_set.write().remove(
+            collider_handle,
+            &mut self.island_manager.write(),
+            &mut self.rigid_body_set.write(),
+            true,
+        );
+    }
+
+    pub fn get_rigid_body(&self, rigid_handle: &RigidBodyHandle) -> Option<MappedRwLockReadGuard<'_, RigidBody>> {
         RwLockReadGuard::try_map(self.rigid_body_set.read(), |p| match p.get(*rigid_handle) {
             Some(c) => Some(c),
             None => None,
@@ -67,45 +86,42 @@ impl RapierPhysicsContainer {
         &mut self,
         rigid_handle: &RigidBodyHandle,
     ) -> Option<MappedRwLockWriteGuard<'_, RigidBody>> {
-        RwLockWriteGuard::try_map(self.rigid_body_set.write(), |p| {
-            match p.get_mut(*rigid_handle) {
-                Some(c) => Some(c),
-                None => None,
-            }
+        RwLockWriteGuard::try_map(self.rigid_body_set.write(), |p| match p.get_mut(*rigid_handle) {
+            Some(c) => Some(c),
+            None => None,
         })
         .ok()
     }
-}
 
-impl Default for RapierPhysicsContainer {
-    fn default() -> Self {
-        let rapier_physics_container = Self {
-            controller: Arc::new(RwLock::new(RapierPhysicsController::create())),
-            rigid_body_set: Arc::new(RwLock::new(RigidBodySet::new())),
-            collider_set: Arc::new(RwLock::new(ColliderSet::new())),
-            query_pipeline: Arc::new(RwLock::new(QueryPipeline::new())),
-            island_manager: Arc::new(RwLock::new(IslandManager::new())),
-        };
-        rapier_physics_container
+    fn rebuild_query_pipeline(&self) {
+        let mut pipeline = self.query_pipeline.write();
+        *pipeline = QueryPipeline::new();
+        pipeline.update(&self.collider_set.read());
     }
 }
 
-impl
-    IPhysicsContainer<
-        RapierPhysicsShape,
-        RapierPhysicsCollider,
-        RapierPhysicsColliderBuilder,
-        RapierQueryFilter,
-    > for RapierPhysicsContainer
+impl IPhysicsContainer<RapierPhysicsShape, RapierPhysicsCollider, RapierPhysicsColliderBuilder, RapierQueryFilter>
+    for RapierPhysicsContainer
 {
+    /// Выполняет шаг физической симуляции.
+    ///
+    /// Периодически перестраивает `QueryPipeline` для обхода бага с деградацией
+    /// производительности при инкрементальных обновлениях:
+    /// - https://github.com/dimforge/rapier/issues/617
     fn step(&self, delta: f32) {
-        self.controller.as_ref().write().step(delta, self);
+        let start = Instant::now();
+        self.controller.write().step(delta, self);
+
+        if *self.colliders_changed.read() {
+            self.rebuild_query_pipeline();
+            *self.colliders_changed.write() = false;
+        }
+
+        *self.last_step_duration.write() = start.elapsed();
     }
 
-    fn spawn_collider(
-        &self,
-        mut collider_builder: RapierPhysicsColliderBuilder,
-    ) -> RapierPhysicsCollider {
+    fn spawn_collider(&self, mut collider_builder: RapierPhysicsColliderBuilder) -> RapierPhysicsCollider {
+        *self.colliders_changed.write() = true;
         let collider = std::mem::take(&mut collider_builder.builder);
         let collider_handle = self.collider_set.write().insert(collider);
         RapierPhysicsCollider::create(&self, collider_handle)
@@ -123,9 +139,7 @@ impl
         let ray = Ray::new(origin, dir.to_na());
 
         let mut rapier_filter = filter.get_filter();
-        let adapter = |handle: ColliderHandle, _: &Collider| {
-            (filter.predicate)(handle.into_raw_parts().0 as usize)
-        };
+        let adapter = |handle: ColliderHandle, _: &Collider| (filter.predicate)(handle.into_raw_parts().0 as usize);
         if filter.is_predicate {
             rapier_filter = rapier_filter.predicate(&adapter);
         }
@@ -170,9 +184,7 @@ impl
         let shape_pos = Isometry::new(origin.to_na(), vector![0.0, 0.0, 0.0]);
 
         let mut rapier_filter = filter.get_filter();
-        let adapter = |handle: ColliderHandle, _: &Collider| {
-            (filter.predicate)(handle.into_raw_parts().0 as usize)
-        };
+        let adapter = |handle: ColliderHandle, _: &Collider| (filter.predicate)(handle.into_raw_parts().0 as usize);
         if filter.is_predicate {
             rapier_filter = rapier_filter.predicate(&adapter);
         }
@@ -196,5 +208,19 @@ impl
             return Some(result);
         }
         return None;
+    }
+
+    fn get_debug_info(&self) -> DebugInfo {
+        let colliders = self.collider_set.read();
+        let bodies = self.rigid_body_set.read();
+        let islands = self.island_manager.read();
+        let step_dur = *self.last_step_duration.read();
+
+        DebugInfo::new()
+            .insert("last_step_dur", step_dur)
+            .insert("colliders", colliders.len())
+            .insert("rigid_bodies", bodies.len())
+            .insert("active_dynamic", islands.active_dynamic_bodies().len())
+            .insert("active_kinematic", islands.active_kinematic_bodies().len())
     }
 }

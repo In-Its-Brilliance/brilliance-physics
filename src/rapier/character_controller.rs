@@ -41,10 +41,14 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
         delta: f64,
         movement: Vector3,
     ) -> Vector3 {
-        let rapier_collider = collider
-            .physics_container
-            .get_collider(&collider.collider_handle)
-            .unwrap();
+        let (shape, position) = {
+            let rapier_collider = collider
+                .physics_container
+                .get_collider(&collider.collider_handle)
+                .unwrap();
+            let shape = rapier_collider.shape().clone_dyn();
+            (shape, *rapier_collider.position())
+        };
 
         let mut rapier_filter = filter.get_filter();
         let adapter = |handle: ColliderHandle, _: &Collider| {
@@ -59,8 +63,8 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
             &collider.physics_container.rigid_body_set.read(),
             &collider.physics_container.collider_set.read(),
             &collider.physics_container.query_pipeline.read(),
-            rapier_collider.shape(),
-            rapier_collider.position(),
+            shape.as_ref(),
+            &position,
             movement.to_na(),
             rapier_filter,
             |_| {},
@@ -75,7 +79,7 @@ impl<'a> IPhysicsCharacterController<RapierPhysicsShape, RapierPhysicsCollider, 
                     &mut collider.physics_container.rigid_body_set.write(),
                     &collider.physics_container.collider_set.read(),
                     &collider.physics_container.query_pipeline.read(),
-                    rapier_collider.shape(),
+                    shape.as_ref(),
                     character_mass,
                     _collisions.iter(),
                     rapier_filter,

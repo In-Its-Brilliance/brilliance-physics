@@ -46,7 +46,7 @@ impl IPhysicsCollider<RapierPhysicsShape> for RapierPhysicsCollider {
     fn get_position(&self) -> NetworkVector3 {
         let collider = self
             .physics_container
-            .get_collider_mut(&self.collider_handle)
+            .get_collider(&self.collider_handle)
             .unwrap();
         na_to_network(&collider.translation())
     }
@@ -71,13 +71,8 @@ impl IPhysicsCollider<RapierPhysicsShape> for RapierPhysicsCollider {
         self.collider_handle.into_raw_parts().0 as usize
     }
 
-    fn remove(&mut self) {
-        self.physics_container.collider_set.write().remove(
-            self.collider_handle,
-            &mut self.physics_container.island_manager.write(),
-            &mut self.physics_container.rigid_body_set.write(),
-            true,
-        );
+    fn remove(&self) {
+        self.physics_container.remove_collider(self.collider_handle.clone());
     }
 
     fn get_shape(&self) -> RapierPhysicsShape {
