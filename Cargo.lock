@@ -624,6 +624,7 @@ dependencies = [
  "downcast-rs",
  "flume",
  "ilattice",
+ "indexmap",
  "lazy_static",
  "log",
  "miniz_oxide",
