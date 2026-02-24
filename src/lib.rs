@@ -39,3 +39,6 @@ pub type PhysicsContainer = physx::container::PhysxPhysicsContainer;
 
 #[cfg(feature = "physics-physx")]
 pub type QueryFilter = physx::query_filter::PhysxQueryFilter;
+
+#[cfg(feature = "physics-physx")]
+pub type PhysicsShape = physx::collider::PhysxPhysicsShape;

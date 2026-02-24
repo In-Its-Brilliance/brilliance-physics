@@ -8,8 +8,10 @@ use super::container::PhysxPhysicsContainer;
 use super::types::{OnAdvance, OnCollision, PxScene, PxShape};
 
 pub struct PhysxPhysicsController {
-    pub(crate) physics: PhysicsFoundation<DefaultAllocator, PxShape>,
+    // IMPORTANT: scene must be declared before physics so it is dropped first.
+    // PhysX requires PxScene to be released before PxFoundation.
     pub(crate) scene: Owner<PxScene>,
+    pub(crate) physics: PhysicsFoundation<DefaultAllocator, PxShape>,
 }
 
 impl PhysxPhysicsController {

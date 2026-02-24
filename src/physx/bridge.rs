@@ -20,3 +20,12 @@ pub(crate) fn network_to_physx_sys(other: &Vector3) -> physx_sys::PxVec3 {
         z: other.z,
     }
 }
+
+/// PhysX capsules are aligned along the X-axis by default.
+/// This quaternion rotates 90° around Z to align the capsule along Y (vertical).
+pub(crate) const CAPSULE_ROTATION: physx_sys::PxQuat = physx_sys::PxQuat {
+    x: 0.0,
+    y: 0.0,
+    z: 0.70710678,
+    w: 0.70710678,
+};
